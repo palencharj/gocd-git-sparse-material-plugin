@@ -1,0 +1,8 @@
+# Normalise to LF in the repository. `gradlew` in particular must keep LF endings or
+# Linux refuses to run it ("bad interpreter"), which breaks CI on any Windows checkout.
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.jar binary
+*.zip binary
+*.png binary
