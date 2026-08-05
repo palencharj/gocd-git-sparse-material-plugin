@@ -113,16 +113,29 @@ class PluginContractTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void onlyUrlAndBranchIdentifyTheMaterial() {
-        // part-of-identity feeds the material fingerprint, which binds a pipeline to its history.
-        // If the paths were part of it, editing them would orphan that history.
+    void theRepositoryBranchAndPathsTogetherIdentifyTheMaterial() {
+        // part-of-identity feeds the material fingerprint. The paths must be included: two
+        // materials on the same repo and branch restricted to different paths are different
+        // materials, and sharing a fingerprint lets fan-in resolve a pipeline against a working
+        // copy that never contained the paths it needs.
         Map<String, Object> config = asMap(handle("scm-configuration", ""));
 
         assertThat(((Map<String, Object>) config.get(ScmConfig.URL)).get("part-of-identity")).isEqualTo(true);
         assertThat(((Map<String, Object>) config.get(ScmConfig.BRANCH)).get("part-of-identity")).isEqualTo(true);
-        assertThat(((Map<String, Object>) config.get(ScmConfig.SPARSE_PATHS)).get("part-of-identity")).isEqualTo(false);
+        assertThat(((Map<String, Object>) config.get(ScmConfig.SPARSE_PATHS)).get("part-of-identity")).isEqualTo(true);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void howMuchHistoryOrWhatTriggersABuildDoesNotIdentifyTheMaterial() {
+        // These change behaviour, not which repository content the material refers to, so they must
+        // stay out of the fingerprint or toggling them would orphan a pipeline's history.
+        Map<String, Object> config = asMap(handle("scm-configuration", ""));
+
         assertThat(((Map<String, Object>) config.get(ScmConfig.SHALLOW)).get("part-of-identity")).isEqualTo(false);
         assertThat(((Map<String, Object>) config.get(ScmConfig.FILTER_BY_PATHS)).get("part-of-identity")).isEqualTo(false);
+        assertThat(((Map<String, Object>) config.get(ScmConfig.USERNAME)).get("part-of-identity")).isEqualTo(false);
+        assertThat(((Map<String, Object>) config.get(ScmConfig.PASSWORD)).get("part-of-identity")).isEqualTo(false);
     }
 
     @Test

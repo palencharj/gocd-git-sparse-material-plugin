@@ -107,10 +107,14 @@ libs/shared/*</value></property>
 
 A few decisions that are load-bearing:
 
-- **The paths are not part of the material's identity.** GoCD derives a material fingerprint from
-  the properties marked `part-of-identity`, and that fingerprint is what ties a pipeline to its
-  material history. Only the URL and branch identify the material here. If the paths were included,
-  editing them would orphan the pipeline's history — so they aren't.
+- **The URL, branch and paths together identify the material.** GoCD derives a material fingerprint
+  from the properties marked `part-of-identity`. The paths are included deliberately: two materials
+  on the same repository and branch but restricted to different paths are genuinely *different*
+  materials, and giving them one fingerprint would let GoCD treat them as interchangeable — so
+  fan-in could resolve a pipeline against a working copy that never contained the paths it needs.
+  On a monorepo, where several pipelines share one repository, that is the common case rather than
+  an edge case. The cost is that editing the paths starts a fresh material history; that is the
+  right trade against silently building the wrong tree.
 - **Patterns are re-applied on every checkout**, which makes the working copy self-healing.
   Widening, narrowing or removing them repairs an existing directory in place. There is no
   "detect the change and re-clone" path to get wrong.
@@ -129,6 +133,10 @@ Worth knowing before you roll this out:
 - **Migrating an existing pipeline resets its material history.** Switching a pipeline from the
   built-in Git material to this one changes the material fingerprint, so GoCD treats it as a
   different material. Expect a fresh history for that material.
+- **Editing the paths also starts a fresh material history**, for the same reason — the paths are
+  part of the material's identity, by design. Get the paths right before you point production
+  pipelines at it, and prefer widening a pattern (`services/billing` → `services/*`) only when you
+  genuinely mean to.
 - **Sparse patterns do not restrict submodule contents.** Submodules are separate repositories
   checked out by `git submodule update`, so excluding a submodule's path in the parent will not stop
   its files appearing. This is how git works, not something the plugin can fix.

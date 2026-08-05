@@ -115,12 +115,18 @@ public class GitSparseMaterialPlugin implements GoPlugin {
 
     private Map<String, Object> scmConfiguration() {
         Map<String, Object> config = new LinkedHashMap<>();
-        // part-of-identity drives the material fingerprint, which is what binds a pipeline to its
-        // material history. Only the repository and branch identify the material; how much of it we
-        // lay down does not, so editing the paths must never orphan a pipeline's history.
+        // part-of-identity drives the material fingerprint (see SCM#getFingerprint in GoCD, which
+        // hashes only the properties marked here).
+        //
+        // The paths are part of it deliberately. Two materials on the same repository and branch but
+        // restricted to different paths are genuinely different materials; giving them one
+        // fingerprint would make GoCD treat them as interchangeable and let fan-in resolve a
+        // pipeline against a working copy that never contained the paths it needs. The cost is that
+        // editing the paths starts a fresh material history, which is the right trade against
+        // silently building the wrong tree.
         config.put(ScmConfig.URL, field("Repository URL", null, true, false, true, 0));
         config.put(ScmConfig.BRANCH, field("Branch", ScmConfig.DEFAULT_BRANCH, true, false, false, 1));
-        config.put(ScmConfig.SPARSE_PATHS, field("Paths to check out", null, false, false, true, 2));
+        config.put(ScmConfig.SPARSE_PATHS, field("Paths to check out", null, true, false, true, 2));
         config.put(ScmConfig.USERNAME, field("Username", null, false, false, false, 3));
         config.put(ScmConfig.PASSWORD, field("Password", null, false, true, false, 4));
         config.put(ScmConfig.SHALLOW, field("Shallow clone", "false", false, false, false, 5));
