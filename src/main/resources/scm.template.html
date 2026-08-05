@@ -1,0 +1,101 @@
+<div data-plugin-style-id="git-sparse-material">
+  <style>
+    [data-plugin-style-id="git-sparse-material"] .form-help-content {
+      color: #666;
+      clear: both;
+      font-size: 0.82rem;
+      font-style: italic;
+      margin-top: -10px;
+      padding-left: 2px;
+      margin-bottom: 12px;
+    }
+
+    [data-plugin-style-id="git-sparse-material"] .form-help-content code {
+      border: 0;
+      padding: 2px 5px;
+      border-radius: 3px;
+      background-color: #eee;
+      font-style: normal;
+    }
+
+    [data-plugin-style-id="git-sparse-material"] textarea {
+      width: 100%;
+      min-height: 7rem;
+      font-family: monospace;
+    }
+  </style>
+
+  <div class="form_item_block required">
+    <label>Repository URL<span class="asterisk">*</span></label>
+    <input type="text" ng-model="url" ng-required="true" tabindex="1"/>
+    <span class="form_error" ng-show="GOINPUTNAME[url].$error.server">
+      {{ GOINPUTNAME[url].$error.server }}
+    </span>
+  </div>
+
+  <div class="form_item_block">
+    <label>Branch</label>
+    <input type="text" ng-model="branch" placeholder="master" tabindex="2"/>
+    <span class="form_error" ng-show="GOINPUTNAME[branch].$error.server">
+      {{ GOINPUTNAME[branch].$error.server }}
+    </span>
+  </div>
+
+  <div class="form_item_block required">
+    <label>Paths to check out<span class="asterisk">*</span></label>
+    <textarea ng-model="sparse_paths" ng-required="true" tabindex="3"
+              placeholder="services/billing&#10;libs/shared/*&#10;build.gradle"></textarea>
+    <span class="form_error" ng-show="GOINPUTNAME[sparse_paths].$error.server">
+      {{ GOINPUTNAME[sparse_paths].$error.server }}
+    </span>
+    <div class="form-help-content">
+      One pattern per line, relative to the repository root, in the same
+      <code>.gitignore</code> syntax that <code>git sparse-checkout</code> uses. Directories,
+      globs and individual files all work &mdash; <code>libs/shared/*</code>,
+      <code>build.gradle</code>. Prefix a line with <code>!</code> to exclude something you
+      matched on an earlier line. Everything you do not list is simply never written to disk.
+    </div>
+  </div>
+
+  <div class="form_item_block">
+    <label>Username</label>
+    <input type="text" ng-model="username" tabindex="4"/>
+    <span class="form_error" ng-show="GOINPUTNAME[username].$error.server">
+      {{ GOINPUTNAME[username].$error.server }}
+    </span>
+    <div class="form-help-content">
+      For HTTP(S) remotes only. Leave both credential fields empty when authenticating over SSH
+      with a key.
+    </div>
+  </div>
+
+  <div class="form_item_block">
+    <label>Password / access token</label>
+    <input type="password" ng-model="password" tabindex="5"/>
+    <span class="form_error" ng-show="GOINPUTNAME[password].$error.server">
+      {{ GOINPUTNAME[password].$error.server }}
+    </span>
+  </div>
+
+  <div class="form_item_block">
+    <input type="checkbox" ng-model="shallow" ng-true-value="'true'" ng-false-value="'false'"
+           id="sparse-shallow" tabindex="6"/>
+    <label for="sparse-shallow">Shallow clone</label>
+    <div class="form-help-content">
+      Fetches only the tip commit. Combines with sparse checkout: shallow limits how much
+      <em>history</em> is fetched, sparse limits how many <em>files</em> are written. The clone is
+      deepened automatically if a build ever needs an older revision.
+    </div>
+  </div>
+
+  <div class="form_item_block">
+    <input type="checkbox" ng-model="filter_by_paths" ng-true-value="'true'"
+           ng-false-value="'false'" id="sparse-filter" tabindex="7"/>
+    <label for="sparse-filter">Only trigger on changes under these paths</label>
+    <div class="form-help-content">
+      Off by default, which means every commit on the branch triggers the pipeline even if it only
+      touched files you do not check out. Turn this on for a monorepo, so the pipeline builds only
+      when its own code changes.
+    </div>
+  </div>
+</div>

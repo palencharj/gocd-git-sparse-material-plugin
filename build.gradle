@@ -1,0 +1,81 @@
+/*
+ * Copyright 2026 John Palenchar
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+plugins {
+  id 'java'
+}
+
+group = 'com.github.palencharj'
+version = project.findProperty('pluginVersion') ?: '1.0.0'
+description = 'GoCD SCM plugin providing a Git material with sparse checkout'
+
+// Java 17 bytecode: runs on every GoCD that ships Java 17 or newer, which is
+// everything from 21.x onwards.
+//
+// Deliberately `options.release` rather than a toolchain, so the project builds with
+// any JDK 17+ already on the machine instead of demanding one exact version.
+java {
+  sourceCompatibility = JavaVersion.VERSION_17
+  targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+  options.release = 17
+  options.encoding = 'UTF-8'
+  options.compilerArgs << '-Xlint:all,-processing'
+}
+
+repositories {
+  mavenCentral()
+}
+
+dependencies {
+  // Provided by the GoCD server/agent at runtime — must NOT be bundled.
+  // Deliberately an older API than the servers we target: the SCM extension is
+  // still at version 1.0 and this surface has been stable for years, so
+  // compiling against 21.4.0 maximises the range of servers we load on.
+  compileOnly 'cd.go.plugin:go-plugin-api:21.4.0'
+
+  implementation 'com.google.code.gson:gson:2.11.0'
+
+  testImplementation 'cd.go.plugin:go-plugin-api:21.4.0'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
+  testImplementation 'org.assertj:assertj-core:3.26.3'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// GoCD's plugin classloader reads dependency jars from `lib/` inside the plugin
+// jar, so we bundle there rather than shading. No relocation needed, and the
+// plugin's Gson can never collide with the server's.
+jar {
+  into('lib') {
+    from configurations.runtimeClasspath
+  }
+  manifest {
+    attributes(
+      'Plugin-Version': project.version,
+      'Implementation-Title': 'GoCD Git Sparse Checkout Material',
+      'Implementation-Version': project.version
+    )
+  }
+}
+
+test {
+  useJUnitPlatform()
+  testLogging {
+    events 'passed', 'skipped', 'failed'
+    exceptionFormat = 'full'
+  }
+}
