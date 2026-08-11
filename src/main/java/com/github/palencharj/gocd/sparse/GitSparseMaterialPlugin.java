@@ -227,6 +227,7 @@ public class GitSparseMaterialPlugin implements GoPlugin {
 
     private Map<String, Object> latestRevision(GoPluginApiRequest request) {
         ScmConfig config = configOf(request);
+        assertConfigUsable(request, config);
         Git git = pollingRepo(request, config);
 
         List<Revision> revisions = git.log(null, pathspecsFor(config));
@@ -241,6 +242,7 @@ public class GitSparseMaterialPlugin implements GoPlugin {
 
     private Map<String, Object> latestRevisionsSince(GoPluginApiRequest request) {
         ScmConfig config = configOf(request);
+        assertConfigUsable(request, config);
         Git git = pollingRepo(request, config);
 
         String previous = previousRevisionOf(request);
@@ -276,9 +278,50 @@ public class GitSparseMaterialPlugin implements GoPlugin {
 
     // ------------------------------------------------------------- checkout
 
+    /**
+     * Re-checks the configuration at runtime, because {@code validate-scm-configuration} is not
+     * reached on the pipelines-as-code path.
+     *
+     * <p>GoCD only invokes the validate handler from the SCM admin CRUD path — {@code
+     * PluggableScmService}, used by the SCM API and the admin UI. A config repo is converted
+     * straight to config objects by {@code ConfigConverter} with no validation call, and preflight
+     * does not run it either. So on that path a typo'd or blank property reaches the material
+     * unchallenged.
+     *
+     * <p>Without this check the failure would be silent and wrong rather than loud: with no usable
+     * paths the material would simply perform a full checkout, so the user gets none of the
+     * behaviour they asked for and no indication why. Failing here is the only remaining
+     * opportunity to say so.
+     */
+    private void assertConfigUsable(GoPluginApiRequest request, ScmConfig config) {
+        List<String> unknown = new ArrayList<>(configKeysOf(request));
+        unknown.removeAll(ScmConfig.KNOWN_KEYS);
+        if (!unknown.isEmpty()) {
+            throw new Git.GitException(
+                    "Unrecognised material propert" + (unknown.size() == 1 ? "y " : "ies ") + unknown
+                            + ". GoCD includes properties this plugin does not declare in the"
+                            + " material's fingerprint, so a typo here silently changes the"
+                            + " material's identity. Valid properties are " + ScmConfig.KNOWN_KEYS
+                            + ".");
+        }
+        if (config.sparsePaths().isEmpty()) {
+            throw new Git.GitException(
+                    "No '" + ScmConfig.SPARSE_PATHS + "' configured. This material exists to"
+                            + " restrict the checkout, so an empty value is a misconfiguration"
+                            + " rather than a request for everything — use GoCD's built-in Git"
+                            + " material for a full checkout.");
+        }
+        if (config.pathspecs().isEmpty()) {
+            throw new Git.GitException(
+                    "Every configured path is an exclusion, so nothing would be checked out. Add at"
+                            + " least one pattern that selects files.");
+        }
+    }
+
     private Map<String, Object> checkout(GoPluginApiRequest request) {
         Map<String, Object> body = body(request);
         ScmConfig config = configOf(request);
+        assertConfigUsable(request, config);
 
         String destination = string(body, "destination-folder");
         if (ScmConfig.isBlank(destination)) {

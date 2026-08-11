@@ -317,6 +317,65 @@ class PluginContractTest {
         assertThat((List<?>) asMap(response).get("revisions")).isEmpty();
     }
 
+    // ---- runtime guards for the pipelines-as-code path ----
+    //
+    // GoCD only calls validate-scm-configuration from the SCM admin CRUD path
+    // (PluggableScmService). A config repo is converted straight to config objects by
+    // ConfigConverter with no validation call, and preflight does not run it either - both
+    // confirmed against 26.1.0. So these checks must also happen at runtime, or a typo'd
+    // config-repo material silently performs a full checkout instead of failing.
+
+    @Test
+    void checkoutFailsRatherThanSilentlyDoingAFullCheckoutWhenPathsAreMissing() {
+        GoPluginApiResponse response = handle("checkout",
+                "{\"scm-configuration\":{\"url\":{\"value\":\"https://example.com/r.git\"}},"
+                        + "\"destination-folder\":\"/tmp/x\",\"revision\":{\"revision\":\"abc\"}}");
+
+        Map<String, Object> result = asMap(response);
+        assertThat(result.get("status")).isEqualTo("failure");
+        assertThat(String.valueOf(result.get("messages"))).contains("sparse_paths");
+    }
+
+    @Test
+    void checkoutFailsOnAnUnrecognisedProperty() {
+        // An undeclared property is folded into the fingerprint by GoCD, so the material has
+        // already lost its identity. Better to say so loudly than build the wrong tree quietly.
+        GoPluginApiResponse response = handle("checkout",
+                "{\"scm-configuration\":{\"url\":{\"value\":\"https://example.com/r.git\"},"
+                        + "\"sparse_paths\":{\"value\":\"src\"},\"pathz\":{\"value\":\"src\"}},"
+                        + "\"destination-folder\":\"/tmp/x\",\"revision\":{\"revision\":\"abc\"}}");
+
+        Map<String, Object> result = asMap(response);
+        assertThat(result.get("status")).isEqualTo("failure");
+        assertThat(String.valueOf(result.get("messages"))).contains("pathz");
+    }
+
+    @Test
+    void pollingFailsOnAnUnusableConfigurationToo() {
+        GoPluginApiResponse response = handle("latest-revision",
+                "{\"scm-configuration\":{\"url\":{\"value\":\"https://example.com/r.git\"},"
+                        + "\"sparse_paths\":{\"value\":\"!only\\n!exclusions\"}},"
+                        + "\"flyweight-folder\":\"/tmp/y\"}");
+
+        assertThat(response.responseCode()).isEqualTo(500);
+        assertThat(response.responseBody()).contains("exclusion");
+    }
+
+    @Test
+    void aValidConfigurationPassesTheRuntimeGuard() {
+        TestRepo origin = TestRepo.create(tempDir.resolve("guard").toFile());
+        origin.write("src/a.txt", "a").commit("initial");
+        java.io.File dest = tempDir.resolve("guarddest").toFile();
+
+        GoPluginApiResponse response = handle("checkout",
+                "{\"scm-configuration\":{\"url\":{\"value\":" + GSON.toJson(origin.url())
+                        + "},\"branch\":{\"value\":\"master\"},\"sparse_paths\":{\"value\":\"src\"}},"
+                        + "\"destination-folder\":" + GSON.toJson(dest.getAbsolutePath()) + ","
+                        + "\"revision\":{\"revision\":" + GSON.toJson(origin.head()) + "}}");
+
+        assertThat(asMap(response).get("status")).isEqualTo("success");
+    }
+
     @Test
     void checkoutLaysDownOnlyTheConfiguredPathsAndReportsSuccess() {
         TestRepo origin = TestRepo.create(tempDir.resolve("origin").toFile());
