@@ -199,6 +199,43 @@ class PluginContractTest {
     }
 
     @Test
+    void rejectsAnUnknownPropertyBecauseGoCdWouldFoldItIntoTheFingerprint() {
+        // A property the plugin does not declare is included in the material fingerprint by GoCD,
+        // so a typo in a config repo's `options:` would silently change the material's identity.
+        // Nothing upstream catches it.
+        GoPluginApiResponse response = handle("validate-scm-configuration",
+                scmConfigJson(ScmConfig.URL, "https://example.com/r.git",
+                        ScmConfig.SPARSE_PATHS, "src",
+                        "pathz", "src"));
+
+        assertThat(asList(response)).extracting(e -> e.get("key")).contains("pathz");
+        assertThat(asList(response)).extracting(e -> e.get("message"))
+                .anyMatch(m -> String.valueOf(m).contains("Unknown property"));
+    }
+
+    @Test
+    void acceptsEveryPropertyItDeclares() {
+        GoPluginApiResponse response = handle("validate-scm-configuration",
+                scmConfigJson(ScmConfig.URL, "https://example.com/r.git",
+                        ScmConfig.BRANCH, "main",
+                        ScmConfig.SPARSE_PATHS, "src",
+                        ScmConfig.USERNAME, "alice",
+                        ScmConfig.PASSWORD, "s3cr3t",
+                        ScmConfig.SHALLOW, "true",
+                        ScmConfig.FILTER_BY_PATHS, "true"));
+
+        assertThat(asList(response)).isEmpty();
+    }
+
+    @Test
+    void everyDeclaredKeyIsInTheKnownKeyList() {
+        // The metadata response and the validation whitelist must not drift apart, or a legitimate
+        // property starts being reported as unknown.
+        assertThat(ScmConfig.KNOWN_KEYS)
+                .containsExactlyInAnyOrderElementsOf(asMap(handle("scm-configuration", "")).keySet());
+    }
+
+    @Test
     void rejectsPathsThatTryToEscapeTheRepository() {
         GoPluginApiResponse response = handle("validate-scm-configuration",
                 scmConfigJson(ScmConfig.URL, "https://example.com/r.git",

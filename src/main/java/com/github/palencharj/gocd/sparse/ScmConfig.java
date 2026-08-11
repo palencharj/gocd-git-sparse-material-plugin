@@ -40,6 +40,19 @@ public final class ScmConfig {
 
     public static final String DEFAULT_BRANCH = "master";
 
+    /**
+     * Every property this plugin understands, in display order.
+     *
+     * <p>Used to reject anything else during validation. That matters more than it looks: GoCD
+     * folds a property into the material fingerprint when the plugin declares no metadata for it
+     * (see {@code SCM#getFingerprint}), so a key we do not know still changes the material's
+     * identity while being silently ignored by us. A typo in a config repo's {@code options:}
+     * would therefore detach a material from its history and produce no error anywhere. Rejecting
+     * unknown keys here is the only place that can be caught.
+     */
+    public static final List<String> KNOWN_KEYS = List.of(
+            URL, BRANCH, SPARSE_PATHS, USERNAME, PASSWORD, SHALLOW, FILTER_BY_PATHS);
+
     private final String url;
     private final String branch;
     private final String sparsePaths;

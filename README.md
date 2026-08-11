@@ -89,7 +89,7 @@ migrate.
 Turn on **Only trigger on changes under these paths** to get monorepo behaviour: the pipeline builds
 only when its own code changes, and the changelog shows only relevant commits.
 
-### As config-repo / XML
+### As XML
 
 ```xml
 <scm id="billing-sparse" name="billing" pluginId="com.github.palencharj.gocd.git-sparse-material">
@@ -102,6 +102,71 @@ libs/shared/*</value></property>
   </configuration>
 </scm>
 ```
+
+### Pipelines as code (config repo)
+
+Declare the material **inline** — no server-side registration needed. Referencing an `scm:` id that
+does not exist rejects the *entire* config repo with HTTP 422 before any pipeline is validated, so
+inline is the form to use.
+
+```yaml
+materials:
+  billing:
+    scm: "billing-sparse"                                     # id this gets registered under
+    plugin_configuration:
+      id: "com.github.palencharj.gocd.git-sparse-material"
+      version: "1"
+    options:
+      url: "https://github.com/acme/monorepo.git"
+      branch: "main"
+      sparse_paths: |
+        services/billing
+        libs/shared/*
+      username: "build-bot"
+      password: "{{SECRET:[my-secrets][GIT_TOKEN]}}"
+      shallow: "false"
+      filter_by_paths: "true"
+    destination: "src"
+```
+
+Notes for the config-repo path specifically:
+
+- **Secrets go in plain `options:`, not `secure_options:`.** `secure_options:` requires real GoCD
+  ciphertext, which is bound to one server's cipher key and so cannot live in git. GoCD resolves
+  `{{SECRET:[store][key]}}` before the plugin ever sees it; the plugin does no `{{SECRET}}` parsing
+  of its own, and scrubs the resolved value from anything it logs or throws.
+- **Every option is a flat string.** `sparse_paths` is one multi-line string (YAML `|`), not a list.
+- **Unknown options are rejected** with a per-key error. GoCD folds a property the plugin does not
+  declare into the material fingerprint, so a typo such as `pathz:` would quietly change the
+  material's identity *and* be ignored — and nothing upstream catches it. The plugin's `validate`
+  therefore refuses anything outside: `url`, `branch`, `sparse_paths`, `username`, `password`,
+  `shallow`, `filter_by_paths`.
+- One `scm:` id can be shared by several pipelines and files.
+- Behaviour is identical whether the config came from XML or a config repo; the plugin holds no
+  server-side state.
+
+Be aware that a config repo is **applied on poll with no approval gate**, and preflight validates
+structure rather than behaviour — it will not tell you the plugin is missing, or that credentials
+are wrong.
+
+## Material identity
+
+Repository URL, branch **and paths** form the material's fingerprint. This is a deliberate choice
+and the trade is worth understanding:
+
+| `sparse_paths` in the fingerprint | Two pipelines, same repo, different paths |
+|---|---|
+| **yes** (what this plugin does) | two distinct materials; each polled and tracked separately |
+| no | one shared material; polled once, but the working copy differs per consumer |
+
+Including the paths means GoCD cannot conflate two pipelines that check out genuinely different
+subsets, which would otherwise let fan-in resolve a pipeline against a working copy that never held
+its code. The costs are that **editing the paths starts a fresh material history**, and that two
+pipelines wanting the *same* subset must reference the *same* SCM config — GoCD rejects a second
+config with an identical spec, because an identical spec is the same material.
+
+Credentials, `shallow` and `filter_by_paths` are deliberately **not** part of the identity, so
+rotating a token or toggling either flag does not orphan history.
 
 ## Design notes
 

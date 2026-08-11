@@ -165,6 +165,20 @@ public class GitSparseMaterialPlugin implements GoPlugin {
         ScmConfig config = configOf(request);
         List<Map<String, String>> errors = new ArrayList<>();
 
+        // Nothing upstream rejects a key we do not recognise. Worse, GoCD includes an undeclared
+        // property in the material fingerprint, so a typo in a config repo's `options:` silently
+        // changes the material's identity and detaches it from its build history. This is the only
+        // place that can be caught, so be strict about it.
+        for (String key : configKeysOf(request)) {
+            if (!ScmConfig.KNOWN_KEYS.contains(key)) {
+                errors.add(error(key, "Unknown property '" + key + "'. GoCD includes properties"
+                        + " this plugin does not declare in the material's fingerprint, so a typo"
+                        + " here would change the material's identity and detach it from its build"
+                        + " history. Valid properties are: "
+                        + String.join(", ", ScmConfig.KNOWN_KEYS) + "."));
+            }
+        }
+
         if (ScmConfig.isBlank(config.url())) {
             errors.add(error(ScmConfig.URL, "Repository URL is required."));
         }
@@ -309,6 +323,16 @@ public class GitSparseMaterialPlugin implements GoPlugin {
         }
         Map<String, Object> parsed = GSON.fromJson(raw, new TypeToken<Map<String, Object>>() {}.getType());
         return parsed == null ? new LinkedHashMap<>() : parsed;
+    }
+
+    /** The property keys actually present in the request, declared or not. */
+    @SuppressWarnings("unchecked")
+    private List<String> configKeysOf(GoPluginApiRequest request) {
+        Object scmConfiguration = body(request).get(REQUEST_SCM_CONFIGURATION);
+        if (!(scmConfiguration instanceof Map)) {
+            return Collections.emptyList();
+        }
+        return new ArrayList<>(((Map<String, Object>) scmConfiguration).keySet());
     }
 
     @SuppressWarnings("unchecked")
