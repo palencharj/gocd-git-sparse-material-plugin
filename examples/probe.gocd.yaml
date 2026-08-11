@@ -1,0 +1,35 @@
+# End-to-end probe for the pipelines-as-code path.
+#
+# Declares the sparse material INLINE - no server-side SCM registration - which is the
+# form the README documents. Registering this branch as a GoCD config repo exercises
+# scm-configuration, scm-view, latest-revision and latest-revisions-since through the
+# config-repo code path, all of which run on the server.
+#
+# Only `checkout` needs an agent, so this validates everything else without one.
+format_version: 10
+pipelines:
+  ZZProbe_SparseConfigRepo:
+    group: ZZProbe
+    materials:
+      code:
+        scm: zz_probe_sparse_inline
+        plugin_configuration:
+          id: com.github.palencharj.gocd.git-sparse-material
+          version: "1"
+        options:
+          url: https://github.com/palencharj/gocd-git-sparse-material-plugin.git
+          branch: main
+          sparse_paths: |
+            src/main
+            build.gradle
+          shallow: "false"
+          filter_by_paths: "false"
+        destination: sparse
+    stages:
+      - probe:
+          jobs:
+            list:
+              tasks:
+                - exec:
+                    command: ls
+                    arguments: ["-R", "sparse"]
