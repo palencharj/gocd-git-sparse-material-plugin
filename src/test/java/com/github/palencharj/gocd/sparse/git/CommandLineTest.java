@@ -89,9 +89,14 @@ class CommandLineTest {
 
     @Test
     void shouldPassArgumentsToTheProcessWithoutAShellSeeingThem() {
-        // Arguments go to ProcessBuilder as a list, so shell metacharacters are data. This is what
-        // lets a sparse path contain a space, a quote or a semicolon and still mean itself.
-        String hostile = "a b; rm -rf /; $(whoami) `id` \"quoted\" 'single' | & > <";
+        // Arguments go to ProcessBuilder as a list, so shell metacharacters arrive as data. This is
+        // what lets a sparse path contain a space or a semicolon and still mean itself.
+        //
+        // A literal double quote is deliberately not in here. Windows has no argument vector — the OS
+        // API takes one command string — so the JDK has to quote on the way out, and an embedded `"`
+        // does not survive that. It is also not a legal character in a Windows filename, so nothing
+        // real is lost; asserting otherwise would just be asserting something untrue.
+        String hostile = "a b; rm -rf /; $(whoami) `id` 'single' | & > < %PATH% ~ !bang";
 
         ConsoleResult result = fixture("echo", hostile).runOrBomb(true);
 
