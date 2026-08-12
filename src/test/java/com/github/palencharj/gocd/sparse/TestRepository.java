@@ -23,41 +23,48 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-/** A throwaway on-disk git repository, so the tests exercise the real git binary. */
-final class TestRepo {
+/**
+ * A throwaway on-disk git repository.
+ *
+ * <p>The tests drive the real {@code git} binary rather than a stub, because what is being tested is
+ * how git behaves — the ordering of {@code sparse-checkout} against {@code reset}, what
+ * {@code disable} leaves behind, how {@code diff-tree} formats its output. A stub would only assert
+ * that this code does what it was written to do.
+ */
+public final class TestRepository {
 
     private final File root;
 
-    private TestRepo(File root) {
+    private TestRepository(File root) {
         this.root = root;
     }
 
-    static TestRepo create(File root) {
+    public static TestRepository create(File root) {
         //noinspection ResultOfMethodCallIgnored
         root.mkdirs();
-        TestRepo repo = new TestRepo(root);
-        repo.git("init", "--quiet", "--initial-branch=master", ".");
-        repo.git("config", "user.email", "test@example.com");
-        repo.git("config", "user.name", "Test User");
-        return repo;
+        TestRepository repository = new TestRepository(root);
+        repository.git("init", "--quiet", "--initial-branch=master", ".");
+        repository.git("config", "user.email", "test@example.com");
+        repository.git("config", "user.name", "Test User");
+        return repository;
     }
 
-    File root() {
+    public File root() {
         return root;
     }
 
     /**
-     * The repository location handed to the plugin.
+     * The repository location to hand the plugin.
      *
-     * <p>A plain absolute path rather than a {@code file:} URL on purpose: {@link File#toURI()}
-     * yields the single-slash {@code file:/path} form, which git parses as an scp-style remote with
-     * the host {@code file}. Git clones local paths natively, so this sidesteps the issue entirely.
+     * <p>A plain absolute path rather than a {@code file:} URL: {@link File#toURI()} produces the
+     * single-slash {@code file:/path} form, which git reads as an scp-style remote whose host is
+     * {@code file}. git clones local paths natively, so this avoids the question.
      */
-    String url() {
+    public String url() {
         return root.getAbsolutePath();
     }
 
-    TestRepo write(String path, String content) {
+    public TestRepository write(String path, String content) {
         try {
             File file = new File(root, path);
             //noinspection ResultOfMethodCallIgnored
@@ -69,33 +76,43 @@ final class TestRepo {
         }
     }
 
-    TestRepo delete(String path) {
+    public TestRepository delete(String path) {
         //noinspection ResultOfMethodCallIgnored
         new File(root, path).delete();
         return this;
     }
 
-    String commit(String message) {
+    public TestRepository move(String from, String to) {
+        git("mv", from, to);
+        return this;
+    }
+
+    public String commit(String message) {
         git("add", "-A");
         git("commit", "--quiet", "-m", message);
         return head();
     }
 
-    String head() {
+    public String head() {
         return git("rev-parse", "HEAD").trim();
     }
 
-    String git(String... args) {
+    public String git(String... args) {
+        return gitIn(root, args);
+    }
+
+    /** Runs git in an arbitrary directory and returns its combined output, ignoring the exit code. */
+    public static String gitIn(File directory, String... args) {
         List<String> command = new ArrayList<>();
         command.add("git");
         command.addAll(Arrays.asList(args));
         try {
-            ProcessBuilder pb = new ProcessBuilder(command).directory(root).redirectErrorStream(true);
-            pb.environment().put("GIT_TERMINAL_PROMPT", "0");
-            Process process = pb.start();
+            ProcessBuilder builder =
+                    new ProcessBuilder(command).directory(directory).redirectErrorStream(true);
+            builder.environment().put("GIT_TERMINAL_PROMPT", "0");
+            Process process = builder.start();
             String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-            int exit = process.waitFor();
-            if (exit != 0) {
+            if (process.waitFor() != 0) {
                 throw new IllegalStateException("git " + String.join(" ", args) + " failed: " + output);
             }
             return output;
@@ -107,10 +124,10 @@ final class TestRepo {
         }
     }
 
-    /** Paths present in a working directory, ignoring {@code .git}, sorted for stable assertions. */
-    static List<String> filesIn(File dir) {
+    /** Paths in a working directory, ignoring {@code .git}, sorted so assertions are stable. */
+    public static List<String> filesIn(File directory) {
         List<String> found = new ArrayList<>();
-        collect(dir, dir, found);
+        collect(directory, directory, found);
         found.sort(String::compareTo);
         return found;
     }
