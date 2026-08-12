@@ -17,7 +17,7 @@
 <go-plugin id="com.github.palencharj.gocd.git-sparse-material" version="1">
   <about>
     <name>Git Sparse Checkout Material</name>
-    <version>1.1.0</version>
+    <version>1.2.0</version>
     <target-go-version>21.4.0</target-go-version>
     <description>
       A Git material that checks out only the paths you ask for, using git's own
