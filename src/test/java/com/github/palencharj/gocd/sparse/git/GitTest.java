@@ -83,6 +83,29 @@ class GitTest {
     }
 
     @Test
+    void shouldTakeEverythingExceptAnExcludedDirectory() {
+        // The form the Perforce migration emits for a depot whose client view takes the
+        // whole thing and then subtracts a path: an include-all followed by a negation.
+        // Asserted here because the migration tool generates it in bulk, and getting the
+        // include-all wrong would silently hand builds an empty or a full working copy.
+        Git.in(workspace, configuration("/*\n!drop")).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .containsExactly("keep/a.txt", "keep/nested/b.txt", "root.txt");
+    }
+
+    @Test
+    void shouldExcludeANestedPathFromAnOtherwiseWholeCheckout() {
+        origin.write("deep/a/b/d.txt", "d").write("deep/a/keep.txt", "k").commit("nest");
+
+        Git.in(workspace, configuration("/*\n!deep/a/b")).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .contains("deep/a/keep.txt", "root.txt")
+                .doesNotContain("deep/a/b/d.txt");
+    }
+
+    @Test
     void shouldCheckOutEverythingWhenNoPathsAreConfigured() {
         Git.in(workspace, configuration("")).checkout(origin.head());
 
