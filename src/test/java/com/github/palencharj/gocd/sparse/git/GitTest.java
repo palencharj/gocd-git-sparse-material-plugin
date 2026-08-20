@@ -106,6 +106,26 @@ class GitTest {
     }
 
     @Test
+    void shouldMatchADirectoryAtAnyDepthWithADoubleStar() {
+        // Perforce writes "any depth" as a '...' in the middle of a path:
+        //     //depot/language/.../FSOcr/...
+        // gitignore-style patterns spell the same thing '**', and the migration tool
+        // translates between them. Asserted here because a mid-path wildcard that is
+        // NOT translated reaches git as "language/.../FSOcr", which the plugin rejects
+        // as directory traversal -- and that is what stopped the first bulk apply.
+        origin.write("language/en/FSOcr/a.txt", "a")
+                .write("language/deep/nested/FSOcr/b.txt", "b")
+                .write("language/en/other/c.txt", "c")
+                .commit("nested language dirs");
+
+        Git.in(workspace, configuration("language/**/FSOcr")).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .contains("language/en/FSOcr/a.txt", "language/deep/nested/FSOcr/b.txt")
+                .doesNotContain("language/en/other/c.txt");
+    }
+
+    @Test
     void shouldCheckOutEverythingWhenNoPathsAreConfigured() {
         Git.in(workspace, configuration("")).checkout(origin.head());
 
