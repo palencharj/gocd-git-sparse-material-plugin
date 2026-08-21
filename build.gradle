@@ -79,3 +79,24 @@ test {
     exceptionFormat = 'full'
   }
 }
+
+// Verifies a real set of sparse specifications against the real repositories they name,
+// by driving the plugin's own checkout code. This is the closest stand-in for an agent
+// there is: `checkout` is the only SCM request that runs agent-side, so it is the only
+// part of this plugin that server-side testing cannot reach.
+//
+//   ./gradlew verifySparseSpecs -Pspecs=/path/specs.json -Pwork=/path/scratch
+tasks.register('verifySparseSpecs', JavaExec) {
+  group = 'verification'
+  description = 'Check real sparse specs against the real repositories (needs network + git credentials)'
+  classpath = sourceSets.test.runtimeClasspath
+  mainClass = 'com.github.palencharj.gocd.sparse.SparseSpecVerifier'
+  args = [
+    "--specs=${project.findProperty('specs') ?: ''}",
+    "--work=${project.findProperty('work') ?: layout.buildDirectory.dir('spec-verification').get().asFile}",
+  ]
+  // The verifier exits non-zero when it finds a broken spec, which is what you want when
+  // gating on it. Here it would bury the report under a Gradle failure banner, and the
+  // report is the whole point -- so read the report, not the exit code.
+  ignoreExitValue = true
+}

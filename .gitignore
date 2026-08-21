@@ -4,3 +4,8 @@ out/
 *.iml
 .idea/
 .DS_Store
+
+# Local spec-verification inputs and scratch output
+/build/
+specs-all.json
+specs-smoke.json
