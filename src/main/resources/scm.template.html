@@ -98,4 +98,16 @@
       when its own code changes.
     </div>
   </div>
+
+  <div class="form_item_block">
+    <input type="checkbox" ng-model="partial_clone" ng-true-value="'true'"
+           ng-false-value="'false'" id="sparse-partial" tabindex="8"/>
+    <label for="sparse-partial">Partial clone (fetch file contents only under the checked-out paths)</label>
+    <div class="form-help-content">
+      Off by default. Without it, the agent downloads the contents of every file in the tree, even
+      a shallow clone does, and sparse checkout only declines to write most of them. Turn this on
+      for a large repository where you check out a small part. Takes effect the next time an agent
+      clones the material; an existing working copy is not re-cloned.
+    </div>
+  </div>
 </div>

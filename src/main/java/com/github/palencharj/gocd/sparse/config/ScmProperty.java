@@ -68,6 +68,20 @@ public enum ScmProperty {
 
     FILTER_BY_PATHS(spec("filter_by_paths")
             .displayName("Only trigger on changes under these paths")
+            .defaultValue("false")),
+
+    /**
+     * Clone the agent's working copy with {@code --filter=blob:none}, so file contents are fetched
+     * only for the paths actually checked out. Without it a clone, even a depth-1 one, transfers
+     * every blob in the tree and sparse-checkout merely declines to write most of them.
+     *
+     * <p>Off by default: it changes what an agent downloads, so it is opted into per material.
+     * Not part of the identity, and absent from every existing configuration, so adding it
+     * re-fingerprints nothing. It takes effect when the working copy is next cloned; an existing
+     * full clone on an agent is left as it is.
+     */
+    PARTIAL_CLONE(spec("partial_clone")
+            .displayName("Partial clone (fetch file contents only under the checked-out paths)")
             .defaultValue("false"));
 
     private final Spec spec;

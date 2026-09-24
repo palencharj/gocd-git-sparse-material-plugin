@@ -78,6 +78,9 @@ class MaterialConfigurationTest {
         assertThat(configuration("url", "u").isShallow()).isFalse();
         assertThat(configuration("url", "u").isFilteredByPaths()).isFalse();
         assertThat(configuration("filter_by_paths", "true").isFilteredByPaths()).isTrue();
+        // partial_clone is opt-in: an existing configuration without the key keeps a full clone.
+        assertThat(configuration("url", "u").isPartialClone()).isFalse();
+        assertThat(configuration("partial_clone", "true").isPartialClone()).isTrue();
     }
 
     @Test

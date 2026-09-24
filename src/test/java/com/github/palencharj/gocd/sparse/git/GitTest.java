@@ -235,6 +235,57 @@ class GitTest {
         assertThat(new File(workspace, ".git/shallow")).exists();
     }
 
+    // ---------------------------------------------------------------- partial clone
+
+    @Test
+    void shouldNotFetchTheContentsOfFilesOutsideTheSparsePathsWhenPartialCloneIsOn() {
+        String kept = origin.git("rev-parse", "HEAD:keep/a.txt").trim();
+        String dropped = origin.git("rev-parse", "HEAD:drop/c.txt").trim();
+
+        Git.in(workspace, partialCloneConfiguration("keep/*", true)).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .containsExactly("keep/a.txt", "keep/nested/b.txt");
+        assertThat(new File(workspace, "keep/a.txt")).hasContent("a");
+        // The point of the flag: the excluded file's blob never reached the agent.
+        assertThat(missingObjects(workspace)).contains(dropped).doesNotContain(kept);
+    }
+
+    @Test
+    void shouldFetchEveryBlobWhenPartialCloneIsOffEvenThoughTheCheckoutIsSparse() {
+        // The control for the test above. Without the flag, the same checkout holds every blob,
+        // so "missing" above is caused by the filter and not by how the objects are counted.
+        String dropped = origin.git("rev-parse", "HEAD:drop/c.txt").trim();
+
+        Git.in(workspace, partialCloneConfiguration("keep/*", false)).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .containsExactly("keep/a.txt", "keep/nested/b.txt");
+        assertThat(missingObjects(workspace)).isEmpty();
+        assertThat(TestRepository.gitIn(workspace, "cat-file", "-t", dropped).trim()).isEqualTo("blob");
+    }
+
+    @Test
+    void shouldWidenAPartialCloneByFetchingTheNewlyIncludedBlobs() {
+        Git.in(workspace, partialCloneConfiguration("keep/*", true)).checkout(origin.head());
+
+        Git.in(workspace, partialCloneConfiguration("keep/*\ndrop/*", true)).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .containsExactly("drop/c.txt", "keep/a.txt", "keep/nested/b.txt");
+        assertThat(new File(workspace, "drop/c.txt")).hasContent("c");
+    }
+
+    @Test
+    void shouldCheckOutAnOlderRevisionFromAShallowPartialClone() {
+        String first = origin.head();
+        origin.write("keep/a.txt", "second").commit("second");
+
+        Git.in(workspace, partialCloneConfiguration("keep/*", true)).checkout(first);
+
+        assertThat(new File(workspace, "keep/a.txt")).hasContent("a");
+    }
+
     @Test
     void shouldDeepenAShallowCloneWhenAnOlderRevisionIsWanted() {
         // A re-run, or a pipeline pinned to a previous commit, asks for a revision outside a
@@ -436,6 +487,35 @@ class GitTest {
                 "sparse_paths", sparsePaths,
                 "shallow", String.valueOf(shallow),
                 "filter_by_paths", String.valueOf(filterByPaths));
+    }
+
+    /**
+     * A shallow configuration with {@code partial_clone} set, pointing at the origin through a
+     * {@code file://} URL.
+     *
+     * <p>The URL form matters: git ignores {@code --filter} on a plain-path clone, which it copies
+     * locally rather than negotiating a pack, so these tests would pass whatever the flag did. The
+     * origin must also allow filters, as GitHub does.
+     */
+    private MaterialConfiguration partialCloneConfiguration(String sparsePaths, boolean partial) {
+        origin.git("config", "uploadpack.allowFilter", "true");
+        origin.git("config", "uploadpack.allowAnySHA1InWant", "true");
+        String url = "file:///" + origin.url().replace('\\', '/');
+        return propertiesOf("url", url,
+                "branch", "master",
+                "sparse_paths", sparsePaths,
+                "shallow", "true",
+                "filter_by_paths", "false",
+                "partial_clone", String.valueOf(partial));
+    }
+
+    /** Object ids reachable from HEAD but absent locally, without triggering a lazy fetch. */
+    private static List<String> missingObjects(File repository) {
+        return TestRepository.gitIn(repository, "rev-list", "--objects", "--missing=print", "HEAD")
+                .lines()
+                .filter(line -> line.startsWith("?"))
+                .map(line -> line.substring(1).trim())
+                .toList();
     }
 
     private static MaterialConfiguration propertiesOf(String... keysAndValues) {

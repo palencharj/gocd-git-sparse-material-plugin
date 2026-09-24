@@ -18,7 +18,7 @@ plugins {
 }
 
 group = 'com.github.palencharj'
-version = "1.2.0"
+version = "1.3.0"
 description = 'GoCD SCM plugin providing a Git material with sparse checkout'
 
 // Java 17 bytecode: runs on every GoCD that ships Java 17 or newer, which is
@@ -74,6 +74,14 @@ jar {
 
 test {
   useJUnitPlatform()
+  // The tests commit into throwaway repositories. Without this, a developer whose global
+  // config signs commits gets a signing prompt (Windows Hello, a hardware key, a passphrase)
+  // for every one of them. GIT_CONFIG_COUNT overrides config for child git processes only.
+  environment 'GIT_CONFIG_COUNT', '2'
+  environment 'GIT_CONFIG_KEY_0', 'commit.gpgsign'
+  environment 'GIT_CONFIG_VALUE_0', 'false'
+  environment 'GIT_CONFIG_KEY_1', 'tag.gpgsign'
+  environment 'GIT_CONFIG_VALUE_1', 'false'
   testLogging {
     events 'passed', 'skipped', 'failed'
     exceptionFormat = 'full'

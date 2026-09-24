@@ -103,6 +103,10 @@ public final class MaterialConfiguration {
         return Boolean.parseBoolean(valueOf(ScmProperty.FILTER_BY_PATHS));
     }
 
+    public boolean isPartialClone() {
+        return Boolean.parseBoolean(valueOf(ScmProperty.PARTIAL_CLONE));
+    }
+
     /** Properties present in the request that this plugin does not declare. */
     public List<String> unknownKeys() {
         List<String> unknown = new ArrayList<>(declaredKeys);

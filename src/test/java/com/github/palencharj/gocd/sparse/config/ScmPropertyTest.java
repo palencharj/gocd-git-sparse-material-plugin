@@ -32,9 +32,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ScmPropertyTest {
 
     @Test
-    void shouldDeclareTheSevenPropertiesTheAdminFormBindsTo() {
+    void shouldDeclareTheEightPropertiesTheAdminFormBindsTo() {
         assertThat(ScmProperty.keys()).containsExactly("url", "branch", "sparse_paths", "username",
-                "password", "shallow", "filter_by_paths");
+                "password", "shallow", "filter_by_paths", "partial_clone");
     }
 
     @Test
@@ -54,6 +54,8 @@ class ScmPropertyTest {
         assertThat(ScmProperty.PASSWORD.isPartOfIdentity()).isFalse();
         assertThat(ScmProperty.SHALLOW.isPartOfIdentity()).isFalse();
         assertThat(ScmProperty.FILTER_BY_PATHS.isPartOfIdentity()).isFalse();
+        // Adding partial_clone must not re-fingerprint the materials already in use.
+        assertThat(ScmProperty.PARTIAL_CLONE.isPartOfIdentity()).isFalse();
     }
 
     @Test
