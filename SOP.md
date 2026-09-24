@@ -19,6 +19,7 @@ Pipeline → Materials → Add → **Git (sparse checkout)**
 | `username` / `password` | credentials for a private repo |
 | `shallow` | `true` to fetch one commit |
 | `filter_by_paths` | `true` to trigger builds only on changes under these paths |
+| `partial_clone` | `true` to fetch file contents only under the checked-out paths (`--filter=blob:none`); applies on the next clone |
 
 ## Paths
 

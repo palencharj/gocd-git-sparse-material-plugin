@@ -214,6 +214,11 @@ public final class Git {
             recreateDirectory();
             git().withWorkingDir(directory.getParentFile())
                     .withArgs("clone", "--no-checkout", "--quiet")
+                    // Later fetches inherit the filter from remote.origin.partialclonefilter, so
+                    // the clone is the only command that needs it; reset --hard then fetches just
+                    // the blobs the sparse patterns select, in one batch.
+                    .when(configuration.isPartialClone(), clone -> clone
+                            .withArg("--filter=blob:none"))
                     .when(configuration.isShallow(), clone -> clone
                             .withArg("--depth=" + SHALLOW_DEPTH)
                             .withArgs("--branch", configuration.branch()))

@@ -140,7 +140,7 @@ Notes for the config-repo path specifically:
   declare into the material fingerprint, so a typo such as `pathz:` would quietly change the
   material's identity *and* be ignored — and nothing upstream catches it. The plugin's `validate`
   therefore refuses anything outside: `url`, `branch`, `sparse_paths`, `username`, `password`,
-  `shallow`, `filter_by_paths`.
+  `shallow`, `filter_by_paths`, `partial_clone`.
 - One `scm:` id can be shared by several pipelines and files.
 - Behaviour is identical whether the config came from XML or a config repo; the plugin holds no
   server-side state.
@@ -165,8 +165,8 @@ its code. The costs are that **editing the paths starts a fresh material history
 pipelines wanting the *same* subset must reference the *same* SCM config — GoCD rejects a second
 config with an identical spec, because an identical spec is the same material.
 
-Credentials, `shallow` and `filter_by_paths` are deliberately **not** part of the identity, so
-rotating a token or toggling either flag does not orphan history.
+Credentials, `shallow`, `filter_by_paths` and `partial_clone` are deliberately **not** part of the
+identity, so rotating a token or toggling any flag does not orphan history.
 
 ## Design notes
 
