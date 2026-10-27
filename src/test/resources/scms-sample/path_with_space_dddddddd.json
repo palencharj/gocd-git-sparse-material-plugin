@@ -1,0 +1,26 @@
+{
+  "auto_update": true,
+  "configuration": [
+    {
+      "key": "url",
+      "value": "git@git.example.com:acme/docs.git"
+    },
+    {
+      "key": "branch",
+      "value": "main"
+    },
+    {
+      "key": "sparse_paths",
+      "value": "My Documents/report.docx"
+    }
+  ],
+  "id": "path_with_space_dddddddd",
+  "name": "path_with_space_dddddddd",
+  "origin": {
+    "type": "gocd"
+  },
+  "plugin_metadata": {
+    "id": "com.github.palencharj.gocd.git-sparse-material",
+    "version": "1"
+  }
+}

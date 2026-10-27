@@ -1,0 +1,34 @@
+{
+  "auto_update": true,
+  "configuration": [
+    {
+      "key": "url",
+      "value": "https://git.example.com/acme/other.git"
+    },
+    {
+      "key": "branch",
+      "value": "main"
+    },
+    {
+      "key": "sparse_paths",
+      "value": "include\r\n\r\nsrc\r\n"
+    },
+    {
+      "key": "shallow",
+      "value": "false"
+    },
+    {
+      "key": "filter_by_paths",
+      "value": "true"
+    }
+  ],
+  "id": "crlf_and_blank_lines_cccccccc",
+  "name": "crlf_and_blank_lines_cccccccc",
+  "origin": {
+    "type": "gocd"
+  },
+  "plugin_metadata": {
+    "id": "com.github.palencharj.gocd.git-sparse-material",
+    "version": "1"
+  }
+}
