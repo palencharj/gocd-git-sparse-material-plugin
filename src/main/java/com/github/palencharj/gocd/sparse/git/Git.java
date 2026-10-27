@@ -265,12 +265,20 @@ public final class Git {
                 .runOrBomb(false).failed();
     }
 
+    private static final List<String> ROOT_FILES = List.of("/*", "!/*/");
+
     /**
      * Applies the configured patterns, or removes sparsity when none are configured.
      *
      * <p>{@code --no-cone} is deliberate. Cone mode is faster but selects only whole directories,
      * while non-cone takes gitignore-style patterns and so can select individual files — which is
      * what makes this a genuine equivalent of a Perforce client view.
+     *
+     * <p>Non-cone mode checks out only what a pattern selects, so repository-root files such as
+     * {@code Directory.Build.props} silently vanish unless listed, and a build that imports them
+     * falls back to doing everything. {@link #ROOT_FILES} is therefore always applied first: it
+     * takes the root-level files and no directories, and because the last matching pattern wins,
+     * the configured patterns can still narrow or exclude any of them.
      */
     private void applySparsePaths() {
         List<String> paths = configuration.sparsePaths();
@@ -280,7 +288,9 @@ public final class Git {
             }
             return;
         }
-        inRepository().withArgs("sparse-checkout", "set", "--no-cone").withArgs(paths)
+        List<String> patterns = new ArrayList<>(ROOT_FILES);
+        patterns.addAll(paths);
+        inRepository().withArgs("sparse-checkout", "set", "--no-cone").withArgs(patterns)
                 .runOrBomb(true);
     }
 

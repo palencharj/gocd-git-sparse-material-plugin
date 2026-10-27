@@ -76,6 +76,11 @@ build.gradle            # a single file
 Non-cone mode is deliberate. Cone mode is faster but can only select whole directories; non-cone can
 select individual files, which is what makes this a real equivalent of a Perforce view.
 
+Repository-root files are always checked out, before your patterns (`/*` then `!/*/`, so root files
+but no root directories). Without that, non-cone mode drops files such as `Directory.Build.props`
+that nothing lists and the build that imports them silently does more work. Your patterns come
+later and win, so `!/Directory.Build.props` still removes one.
+
 One pattern per line, because real repositories contain paths with spaces and commas in them.
 
 ### Triggering vs. checking out
