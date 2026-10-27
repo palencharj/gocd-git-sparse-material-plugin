@@ -63,6 +63,26 @@ class GitTest {
         Git.in(workspace, configuration("keep/*")).checkout(origin.head());
 
         assertThat(TestRepository.filesIn(workspace))
+                .containsExactly("keep/a.txt", "keep/nested/b.txt", "root.txt");
+    }
+
+    @Test
+    void shouldAlwaysCheckOutTheRootFilesEvenWhenNoPatternNamesThem() {
+        // Non-cone mode takes only what a pattern selects, so a root file such as
+        // Directory.Build.props that no pattern lists used to vanish and the build that imports
+        // it quietly did everything itself. The plugin now always takes root files, and no
+        // root-level directory, before the configured patterns.
+        Git.in(workspace, configuration("keep/nested/*")).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
+                .containsExactly("keep/nested/b.txt", "root.txt");
+    }
+
+    @Test
+    void shouldLetAConfiguredPatternExcludeARootFile() {
+        Git.in(workspace, configuration("keep/*\n!/root.txt")).checkout(origin.head());
+
+        assertThat(TestRepository.filesIn(workspace))
                 .containsExactly("keep/a.txt", "keep/nested/b.txt");
     }
 
@@ -70,16 +90,16 @@ class GitTest {
     void shouldCheckOutAnIndividualFileAndNotJustWholeDirectories() {
         // The entire reason for --no-cone: cone mode can only select directories, which would make
         // this no substitute for a Perforce client view.
-        Git.in(workspace, configuration("root.txt")).checkout(origin.head());
+        Git.in(workspace, configuration("keep/a.txt")).checkout(origin.head());
 
-        assertThat(TestRepository.filesIn(workspace)).containsExactly("root.txt");
+        assertThat(TestRepository.filesIn(workspace)).containsExactly("keep/a.txt", "root.txt");
     }
 
     @Test
     void shouldHonourExclusionPatterns() {
         Git.in(workspace, configuration("keep/*\n!keep/nested/")).checkout(origin.head());
 
-        assertThat(TestRepository.filesIn(workspace)).containsExactly("keep/a.txt");
+        assertThat(TestRepository.filesIn(workspace)).containsExactly("keep/a.txt", "root.txt");
     }
 
     @Test
@@ -141,7 +161,7 @@ class GitTest {
         Git.in(workspace, configuration("keep/*\nroot.txt")).checkout(head);
         assertThat(TestRepository.filesIn(workspace)).contains("root.txt");
 
-        Git.in(workspace, configuration("keep/*")).checkout(head);
+        Git.in(workspace, configuration("keep/*\n!/root.txt")).checkout(head);
 
         assertThat(TestRepository.filesIn(workspace))
                 .containsExactly("keep/a.txt", "keep/nested/b.txt");
@@ -191,7 +211,7 @@ class GitTest {
         Git.in(workspace, configuration("keep/*")).checkout(second);
 
         assertThat(TestRepository.filesIn(workspace))
-                .containsExactly("keep/a.txt", "keep/nested/b.txt");
+                .containsExactly("keep/a.txt", "keep/nested/b.txt", "root.txt");
         assertThat(new File(workspace, "keep/a.txt")).hasContent("a-updated");
         assertThat(new File(workspace, "drop/new.txt")).doesNotExist();
     }
@@ -231,7 +251,7 @@ class GitTest {
         Git.in(workspace, configuration("keep/*", true, false)).checkout(origin.head());
 
         assertThat(TestRepository.filesIn(workspace))
-                .containsExactly("keep/a.txt", "keep/nested/b.txt");
+                .containsExactly("keep/a.txt", "keep/nested/b.txt", "root.txt");
         assertThat(new File(workspace, ".git/shallow")).exists();
     }
 
@@ -245,7 +265,7 @@ class GitTest {
         Git.in(workspace, partialCloneConfiguration("keep/*", true)).checkout(origin.head());
 
         assertThat(TestRepository.filesIn(workspace))
-                .containsExactly("keep/a.txt", "keep/nested/b.txt");
+                .containsExactly("keep/a.txt", "keep/nested/b.txt", "root.txt");
         assertThat(new File(workspace, "keep/a.txt")).hasContent("a");
         // The point of the flag: the excluded file's blob never reached the agent.
         assertThat(missingObjects(workspace)).contains(dropped).doesNotContain(kept);
@@ -260,7 +280,7 @@ class GitTest {
         Git.in(workspace, partialCloneConfiguration("keep/*", false)).checkout(origin.head());
 
         assertThat(TestRepository.filesIn(workspace))
-                .containsExactly("keep/a.txt", "keep/nested/b.txt");
+                .containsExactly("keep/a.txt", "keep/nested/b.txt", "root.txt");
         assertThat(missingObjects(workspace)).isEmpty();
         assertThat(TestRepository.gitIn(workspace, "cat-file", "-t", dropped).trim()).isEqualTo("blob");
     }
@@ -272,7 +292,7 @@ class GitTest {
         Git.in(workspace, partialCloneConfiguration("keep/*\ndrop/*", true)).checkout(origin.head());
 
         assertThat(TestRepository.filesIn(workspace))
-                .containsExactly("drop/c.txt", "keep/a.txt", "keep/nested/b.txt");
+                .containsExactly("drop/c.txt", "keep/a.txt", "keep/nested/b.txt", "root.txt");
         assertThat(new File(workspace, "drop/c.txt")).hasContent("c");
     }
 
