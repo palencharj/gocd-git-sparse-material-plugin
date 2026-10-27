@@ -148,6 +148,64 @@ public enum ScmProperty {
         return Arrays.stream(values()).map(ScmProperty::key).toList();
     }
 
+    /** Names people reach for that are not this plugin's, and the property they meant. */
+    private static final Map<String, String> ALIASES = Map.ofEntries(
+            Map.entry("paths", "sparse_paths"), Map.entry("path", "sparse_paths"),
+            Map.entry("sparse", "sparse_paths"), Map.entry("include", "sparse_paths"),
+            Map.entry("includes", "sparse_paths"), Map.entry("patterns", "sparse_paths"),
+            Map.entry("repo", "url"), Map.entry("repository", "url"),
+            Map.entry("repository_url", "url"), Map.entry("git_url", "url"),
+            Map.entry("ref", "branch"), Map.entry("branch_name", "branch"),
+            Map.entry("user", "username"), Map.entry("token", "password"),
+            Map.entry("pass", "password"), Map.entry("partial", "partial_clone"));
+
+    /**
+     * The declared property an unrecognised key was most likely meant to be, if any.
+     *
+     * <p>Matches on case and separators ({@code Sparse-Paths}), on a known alias, and on a small edit
+     * distance ({@code sparse_path}, {@code shalow}). Advice only: the key is still rejected.
+     */
+    public static Optional<String> suggestionFor(String unknown) {
+        String squashed = squash(unknown);
+        String alias = ALIASES.get(squashed);
+        if (alias != null) {
+            return Optional.of(alias);
+        }
+        String best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (ScmProperty property : values()) {
+            String candidate = squash(property.key());
+            int distance = candidate.equals(squashed) ? 0 : editDistance(candidate, squashed);
+            // Allow one slip per five characters, at least one, so 'url' is not matched by noise.
+            if (distance <= Math.max(1, candidate.length() / 5) && distance < bestDistance) {
+                best = property.key();
+                bestDistance = distance;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
+    private static String squash(String key) {
+        return key.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private static int editDistance(String a, String b) {
+        int[] previous = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) {
+            previous[j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            int[] current = new int[b.length() + 1];
+            current[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int substitution = previous[j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1);
+                current[j] = Math.min(substitution, Math.min(previous[j] + 1, current[j - 1] + 1));
+            }
+            previous = current;
+        }
+        return previous[b.length()];
+    }
+
     public static Optional<ScmProperty> forKey(String key) {
         return Arrays.stream(values()).filter(property -> property.key().equals(key)).findFirst();
     }

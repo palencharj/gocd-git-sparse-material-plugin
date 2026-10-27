@@ -164,20 +164,26 @@ public final class MaterialConfiguration {
         List<ValidationError> errors = new ArrayList<>();
 
         for (String unknown : unknownKeys()) {
-            errors.add(new ValidationError(unknown, "Unrecognised property '" + unknown
-                    + "'. GoCD includes properties this plugin does not declare in the material's"
-                    + " fingerprint, so a typo here silently changes which material a pipeline"
-                    + " points at. Valid properties are " + ScmProperty.keys() + "."));
+            String suggestion = ScmProperty.suggestionFor(unknown)
+                    .map(key -> " Did you mean '" + key + "'?").orElse("");
+            errors.add(new ValidationError(unknown, "Unrecognised property '" + unknown + "'."
+                    + suggestion + " Valid properties are " + ScmProperty.keys() + " (in a config"
+                    + " repo these are the keys under 'options:', all flat strings). GoCD includes"
+                    + " properties this plugin does not declare in the material's fingerprint, so a"
+                    + " typo here would silently change which material a pipeline points at."));
         }
 
         if (isBlank(url())) {
-            errors.add(new ValidationError(ScmProperty.URL.key(), "Repository URL is required."));
+            errors.add(new ValidationError(ScmProperty.URL.key(),
+                    "Repository URL is required. Set 'url' (under 'options:' in a config repo)"
+                            + " to an https:// or ssh repository URL."));
         }
 
         List<String> paths = sparsePaths();
         if (paths.isEmpty()) {
             errors.add(new ValidationError(ScmProperty.SPARSE_PATHS.key(),
-                    "Enter at least one path, one per line. This material exists to restrict the"
+                    "Enter at least one path, one per line (in YAML, a '|' block under"
+                            + " 'sparse_paths'). This material exists to restrict the"
                             + " checkout, so an empty value is a misconfiguration rather than a"
                             + " request for everything — use GoCD's built-in Git material for a"
                             + " full checkout."));
@@ -221,9 +227,10 @@ public final class MaterialConfiguration {
         // Each message is prefixed with the property it belongs to. In the UI that attribution comes
         // from the field the message is attached to; in a console log it has to be in the text, or
         // the reader is left guessing which setting to go and fix.
-        StringBuilder message = new StringBuilder("This material is not configured correctly.");
+        StringBuilder message = new StringBuilder("This material is not configured correctly ("
+                + errors.size() + (errors.size() == 1 ? " problem):" : " problems):"));
         for (ValidationError error : errors) {
-            message.append(' ').append(error.key()).append(": ").append(error.message());
+            message.append("\n  - ").append(error.key()).append(": ").append(error.message());
         }
         throw new MaterialException(message.toString());
     }
