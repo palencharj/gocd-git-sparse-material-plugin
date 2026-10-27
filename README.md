@@ -61,6 +61,7 @@ Add a material to a pipeline, choose **Git (sparse checkout)**, and fill in:
 | **Username** / **Password** | HTTP(S) only. Leave empty for SSH keys. The password is stored encrypted and never appears in logs. |
 | **Shallow clone** | Fetch only the tip commit. Deepens automatically if a build needs an older revision. |
 | **Only trigger on changes under these paths** | Off by default. See below. |
+| **Partial clone** | Off by default. Fetch file contents only for the checked-out paths (`--filter=blob:none`). Applies the next time an agent clones; see [Partial clone](#partial-clone). |
 
 ### Patterns
 
@@ -110,44 +111,74 @@ does not exist rejects the *entire* config repo with HTTP 422 before any pipelin
 inline is the form to use.
 
 ```yaml
-materials:
+format_version: 10
+pipelines:
   billing:
-    scm: "billing-sparse"                                     # id this gets registered under
-    plugin_configuration:
-      id: "com.github.palencharj.gocd.git-sparse-material"
-      version: "1"
-    options:
-      url: "https://github.com/acme/monorepo.git"
-      branch: "main"
-      sparse_paths: |
-        services/billing
-        libs/shared/*
-      username: "build-bot"
-      password: "{{SECRET:[my-secrets][GIT_TOKEN]}}"
-      shallow: "false"
-      filter_by_paths: "true"
-    destination: "src"
+    group: monorepo
+    materials:
+      billing:
+        scm: "billing-sparse"                                 # id this gets registered under
+        plugin_configuration:
+          id: "com.github.palencharj.gocd.git-sparse-material"
+          version: "1"
+        options:
+          url: "https://github.com/acme/monorepo.git"
+          branch: "main"
+          sparse_paths: |
+            services/billing
+            libs/shared/*
+          username: "build-bot"
+          password: "{{SECRET:[my-secrets][GIT_TOKEN]}}"
+          shallow: "true"
+          partial_clone: "true"
+          filter_by_paths: "true"
+        destination: "src"
 ```
 
-Notes for the config-repo path specifically:
+Every option, its type and its default is in [`docs/options.schema.json`](docs/options.schema.json),
+a JSON Schema generated from the plugin's own property list (a test fails if the two drift). Point a
+YAML linter at it to check `options:` offline; it is a little stricter than the plugin on purpose
+(see *Flags* below).
+
+#### Authoring checklist
 
 - **Secrets go in plain `options:`, not `secure_options:`.** `secure_options:` requires real GoCD
   ciphertext, which is bound to one server's cipher key and so cannot live in git. GoCD resolves
   `{{SECRET:[store][key]}}` before the plugin ever sees it; the plugin does no `{{SECRET}}` parsing
   of its own, and scrubs the resolved value from anything it logs or throws.
-- **Every option is a flat string.** `sparse_paths` is one multi-line string (YAML `|`), not a list.
-- **Unknown options are rejected** with a per-key error. GoCD folds a property the plugin does not
-  declare into the material fingerprint, so a typo such as `pathz:` would quietly change the
-  material's identity *and* be ignored — and nothing upstream catches it. The plugin's `validate`
-  therefore refuses anything outside: `url`, `branch`, `sparse_paths`, `username`, `password`,
-  `shallow`, `filter_by_paths`, `partial_clone`.
-- One `scm:` id can be shared by several pipelines and files.
+- **Every option is a flat string.** Quote the flags (`"true"`, `"false"`).
+- **`sparse_paths` is one multi-line string.** Use a literal block (`|`). A folded block (`>`) joins
+  the lines with spaces into a *single* pattern, and because a space is legal in a path the plugin
+  cannot tell. The block's trailing newline (`|`, `|+`), CRLF line endings, blank lines and indentation
+  are all ignored; each line is one pattern.
+- **`plugin_configuration.version` is `"1"`.** The plugin never sees it.
+- **Unknown options are rejected** with a per-key error that names the key and, where it can,
+  suggests the one you meant (`sparse_path` → `sparse_paths`). GoCD folds a property the plugin does
+  not declare into the material fingerprint, so a typo such as `pathz:` would quietly change the
+  material's identity *and* be ignored — and nothing upstream catches it. The accepted options are:
+  `url`, `branch`, `sparse_paths`, `username`, `password`, `shallow`, `filter_by_paths`,
+  `partial_clone`.
+- **Flags.** `true` and `false` are recognised in any case. Anything else — `yes`, `1`, `on` — is
+  silently treated as `false`, as it always has been; that is left alone so that no existing
+  configuration starts failing, and the JSON Schema flags it instead.
+- **Sharing one `scm:` id.** One id can be referenced by several pipelines and files. If they must
+  point at the same subset, share the id: two ids with identical url, branch and paths are the same
+  material and GoCD rejects the second.
+- **Where errors show up.** A config repo skips `validate`, so the same checks run when the material
+  is polled or checked out; a failure is reported there, listing every problem with its key.
 - Behaviour is identical whether the config came from XML or a config repo; the plugin holds no
   server-side state.
 
 Be aware that a config repo is **applied on poll with no approval gate**, and preflight validates
 structure rather than behaviour — it will not tell you the plugin is missing, or that credentials
 are wrong.
+
+#### Partial clone
+
+`partial_clone: "true"` clones the agent's working copy with `--filter=blob:none`, so file contents
+are fetched only for the checked-out paths instead of the whole tree. It is not part of the material
+identity, so turning it on does not reset history. It takes effect the next time an agent clones; a
+working copy that is already a full clone is left as it is.
 
 ## Material identity
 

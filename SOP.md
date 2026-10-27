@@ -63,3 +63,35 @@ Checked out 9f7272a with 3 paths: include, src, PropertySheets
 ```
 
 Missing files at compile time means the list is too narrow. Widen to the directory.
+
+## As code (config repo)
+
+Declare the material inline; do not reference an `scm:` id that is not already registered
+(that rejects the whole config repo with a 422).
+
+```yaml
+materials:
+  code:
+    scm: "billing-sparse"
+    plugin_configuration:
+      id: "com.github.palencharj.gocd.git-sparse-material"
+      version: "1"
+    options:
+      url: "https://github.com/acme/monorepo.git"
+      branch: "main"
+      sparse_paths: |
+        include
+        src
+      username: "build-bot"
+      password: "{{SECRET:[store][GIT_TOKEN]}}"
+      shallow: "true"
+      partial_clone: "true"
+    destination: "code"
+```
+
+- `sparse_paths` is a `|` block, never `>` (a folded block becomes one pattern).
+- Quote the flags: `"true"` / `"false"`. Anything other than `true` means false, silently.
+- Secrets go under `options:` as `{{SECRET:[store][key]}}`, not under `secure_options:`.
+- A misspelt option is rejected, and the error names the option you probably meant.
+- Several pipelines that want the same url + branch + paths must share one `scm:` id.
+- All options: `docs/options.schema.json`.

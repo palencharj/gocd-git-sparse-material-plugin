@@ -1,0 +1,38 @@
+{
+  "auto_update": true,
+  "configuration": [
+    {
+      "key": "url",
+      "value": "https://git.example.com/acme/monorepo.git"
+    },
+    {
+      "key": "branch",
+      "value": "main"
+    },
+    {
+      "key": "sparse_paths",
+      "value": "services/billing"
+    },
+    {
+      "key": "shallow",
+      "value": "true"
+    },
+    {
+      "key": "username",
+      "value": "build-bot"
+    },
+    {
+      "key": "password",
+      "encrypted_value": "AES:not-a-real-secret"
+    }
+  ],
+  "id": "basic_sparse_aaaaaaaa",
+  "name": "basic_sparse_aaaaaaaa",
+  "origin": {
+    "type": "gocd"
+  },
+  "plugin_metadata": {
+    "id": "com.github.palencharj.gocd.git-sparse-material",
+    "version": "1"
+  }
+}

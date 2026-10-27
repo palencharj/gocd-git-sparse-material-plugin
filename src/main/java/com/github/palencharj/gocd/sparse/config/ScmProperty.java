@@ -54,21 +54,34 @@ import java.util.Optional;
  */
 public enum ScmProperty {
 
-    URL(spec("url").displayName("Repository URL").partOfIdentity().required()),
+    URL(spec("url").displayName("Repository URL").partOfIdentity().required()
+            .describedAs("Repository URL, https:// or ssh.")),
 
-    BRANCH(spec("branch").displayName("Branch").defaultValue("master").partOfIdentity()),
+    BRANCH(spec("branch").displayName("Branch").defaultValue("master").partOfIdentity()
+            .describedAs("Branch to poll and check out. Defaults to master.")),
 
-    SPARSE_PATHS(spec("sparse_paths").displayName("Paths to check out").partOfIdentity().required()),
+    SPARSE_PATHS(spec("sparse_paths").displayName("Paths to check out").partOfIdentity().required()
+            .multiline()
+            .describedAs("Paths to check out, one gitignore-style pattern per line. In YAML use a"
+                    + " literal block (|), not a folded one (>): a folded block joins the lines into"
+                    + " one pattern.")),
 
-    USERNAME(spec("username").displayName("Username")),
+    USERNAME(spec("username").displayName("Username")
+            .describedAs("HTTP(S) username. Leave out for SSH keys.")),
 
-    PASSWORD(spec("password").displayName("Password").secure()),
+    PASSWORD(spec("password").displayName("Password").secure()
+            .describedAs("HTTP(S) password or token. In a config repo use a secret reference such"
+                    + " as {{SECRET:[store][key]}} under options: (not secure_options:).")),
 
-    SHALLOW(spec("shallow").displayName("Shallow clone").defaultValue("false")),
+    SHALLOW(spec("shallow").displayName("Shallow clone").defaultValue("false").flag()
+            .describedAs("Fetch only the tip commit; deepens automatically when a build needs an"
+                    + " older revision.")),
 
     FILTER_BY_PATHS(spec("filter_by_paths")
             .displayName("Only trigger on changes under these paths")
-            .defaultValue("false")),
+            .defaultValue("false").flag()
+            .describedAs("Poll only commits that touch the sparse paths, so a pipeline builds only"
+                    + " when its own code changes.")),
 
     /**
      * Clone the agent's working copy with {@code --filter=blob:none}, so file contents are fetched
@@ -82,7 +95,9 @@ public enum ScmProperty {
      */
     PARTIAL_CLONE(spec("partial_clone")
             .displayName("Partial clone (fetch file contents only under the checked-out paths)")
-            .defaultValue("false"));
+            .defaultValue("false").flag()
+            .describedAs("Clone the agent's working copy with --filter=blob:none so file contents"
+                    + " are fetched only for the checked-out paths. Applies on the next clone."));
 
     private final Spec spec;
 
@@ -114,8 +129,81 @@ public enum ScmProperty {
         return spec.required;
     }
 
+    /** One-sentence help text; documentation only, never sent to GoCD. */
+    public String description() {
+        return spec.description;
+    }
+
+    /** True for a {@code "true"}/{@code "false"} option. */
+    public boolean isFlag() {
+        return spec.flag;
+    }
+
+    /** True for an option whose value is one entry per line. */
+    public boolean isMultiline() {
+        return spec.multiline;
+    }
+
     public static List<String> keys() {
         return Arrays.stream(values()).map(ScmProperty::key).toList();
+    }
+
+    /** Names people reach for that are not this plugin's, and the property they meant. */
+    private static final Map<String, String> ALIASES = Map.ofEntries(
+            Map.entry("paths", "sparse_paths"), Map.entry("path", "sparse_paths"),
+            Map.entry("sparse", "sparse_paths"), Map.entry("include", "sparse_paths"),
+            Map.entry("includes", "sparse_paths"), Map.entry("patterns", "sparse_paths"),
+            Map.entry("repo", "url"), Map.entry("repository", "url"),
+            Map.entry("repository_url", "url"), Map.entry("git_url", "url"),
+            Map.entry("ref", "branch"), Map.entry("branch_name", "branch"),
+            Map.entry("user", "username"), Map.entry("token", "password"),
+            Map.entry("pass", "password"), Map.entry("partial", "partial_clone"));
+
+    /**
+     * The declared property an unrecognised key was most likely meant to be, if any.
+     *
+     * <p>Matches on case and separators ({@code Sparse-Paths}), on a known alias, and on a small edit
+     * distance ({@code sparse_path}, {@code shalow}). Advice only: the key is still rejected.
+     */
+    public static Optional<String> suggestionFor(String unknown) {
+        String squashed = squash(unknown);
+        String alias = ALIASES.get(squashed);
+        if (alias != null) {
+            return Optional.of(alias);
+        }
+        String best = null;
+        int bestDistance = Integer.MAX_VALUE;
+        for (ScmProperty property : values()) {
+            String candidate = squash(property.key());
+            int distance = candidate.equals(squashed) ? 0 : editDistance(candidate, squashed);
+            // Allow one slip per five characters, at least one, so 'url' is not matched by noise.
+            if (distance <= Math.max(1, candidate.length() / 5) && distance < bestDistance) {
+                best = property.key();
+                bestDistance = distance;
+            }
+        }
+        return Optional.ofNullable(best);
+    }
+
+    private static String squash(String key) {
+        return key.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]", "");
+    }
+
+    private static int editDistance(String a, String b) {
+        int[] previous = new int[b.length() + 1];
+        for (int j = 0; j <= b.length(); j++) {
+            previous[j] = j;
+        }
+        for (int i = 1; i <= a.length(); i++) {
+            int[] current = new int[b.length() + 1];
+            current[0] = i;
+            for (int j = 1; j <= b.length(); j++) {
+                int substitution = previous[j - 1] + (a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1);
+                current[j] = Math.min(substitution, Math.min(previous[j] + 1, current[j - 1] + 1));
+            }
+            previous = current;
+        }
+        return previous[b.length()];
     }
 
     public static Optional<ScmProperty> forKey(String key) {
@@ -162,6 +250,9 @@ public enum ScmProperty {
         private boolean partOfIdentity;
         private boolean secure;
         private boolean required;
+        private boolean flag;
+        private boolean multiline;
+        private String description = "";
 
         private Spec(String key) {
             this.key = key;
@@ -190,6 +281,21 @@ public enum ScmProperty {
 
         private Spec required() {
             this.required = true;
+            return this;
+        }
+
+        private Spec flag() {
+            this.flag = true;
+            return this;
+        }
+
+        private Spec multiline() {
+            this.multiline = true;
+            return this;
+        }
+
+        private Spec describedAs(String description) {
+            this.description = description;
             return this;
         }
     }
