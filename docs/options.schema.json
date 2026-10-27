@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "options: for the Git sparse checkout material",
+  "description": "The options: block of a pipelines-as-code material declared with plugin_configuration.id com.github.palencharj.gocd.git-sparse-material (version \"1\"). Every value is a flat string. Generated from ScmProperty; do not edit by hand.",
+  "x-gocd-plugin-id": "com.github.palencharj.gocd.git-sparse-material",
+  "x-gocd-plugin-configuration-version": "1",
+  "type": "object",
+  "properties": {
+    "url": {
+      "type": "string",
+      "description": "Repository URL, https:// or ssh.",
+      "pattern": "\\S",
+      "x-gocd-part-of-identity": true
+    },
+    "branch": {
+      "type": "string",
+      "description": "Branch to poll and check out. Defaults to master.",
+      "default": "master",
+      "x-gocd-part-of-identity": true
+    },
+    "sparse_paths": {
+      "type": "string",
+      "description": "Paths to check out, one gitignore-style pattern per line. In YAML use a literal block (|), not a folded one (>): a folded block joins the lines into one pattern.",
+      "pattern": "\\S",
+      "x-gocd-part-of-identity": true,
+      "x-multiline": "one entry per line"
+    },
+    "username": {
+      "type": "string",
+      "description": "HTTP(S) username. Leave out for SSH keys.",
+      "x-gocd-part-of-identity": false
+    },
+    "password": {
+      "type": "string",
+      "description": "HTTP(S) password or token. In a config repo use a secret reference such as {{SECRET:[store][key]}} under options: (not secure_options:).",
+      "x-gocd-part-of-identity": false,
+      "x-gocd-secret": true
+    },
+    "shallow": {
+      "type": "string",
+      "description": "Fetch only the tip commit; deepens automatically when a build needs an older revision.",
+      "default": "false",
+      "enum": [
+        "true",
+        "false"
+      ],
+      "x-gocd-part-of-identity": false
+    },
+    "filter_by_paths": {
+      "type": "string",
+      "description": "Poll only commits that touch the sparse paths, so a pipeline builds only when its own code changes.",
+      "default": "false",
+      "enum": [
+        "true",
+        "false"
+      ],
+      "x-gocd-part-of-identity": false
+    },
+    "partial_clone": {
+      "type": "string",
+      "description": "Clone the agent's working copy with --filter=blob:none so file contents are fetched only for the checked-out paths. Applies on the next clone.",
+      "default": "false",
+      "enum": [
+        "true",
+        "false"
+      ],
+      "x-gocd-part-of-identity": false
+    }
+  },
+  "required": [
+    "url",
+    "sparse_paths"
+  ],
+  "additionalProperties": false
+}

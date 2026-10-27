@@ -54,21 +54,34 @@ import java.util.Optional;
  */
 public enum ScmProperty {
 
-    URL(spec("url").displayName("Repository URL").partOfIdentity().required()),
+    URL(spec("url").displayName("Repository URL").partOfIdentity().required()
+            .describedAs("Repository URL, https:// or ssh.")),
 
-    BRANCH(spec("branch").displayName("Branch").defaultValue("master").partOfIdentity()),
+    BRANCH(spec("branch").displayName("Branch").defaultValue("master").partOfIdentity()
+            .describedAs("Branch to poll and check out. Defaults to master.")),
 
-    SPARSE_PATHS(spec("sparse_paths").displayName("Paths to check out").partOfIdentity().required()),
+    SPARSE_PATHS(spec("sparse_paths").displayName("Paths to check out").partOfIdentity().required()
+            .multiline()
+            .describedAs("Paths to check out, one gitignore-style pattern per line. In YAML use a"
+                    + " literal block (|), not a folded one (>): a folded block joins the lines into"
+                    + " one pattern.")),
 
-    USERNAME(spec("username").displayName("Username")),
+    USERNAME(spec("username").displayName("Username")
+            .describedAs("HTTP(S) username. Leave out for SSH keys.")),
 
-    PASSWORD(spec("password").displayName("Password").secure()),
+    PASSWORD(spec("password").displayName("Password").secure()
+            .describedAs("HTTP(S) password or token. In a config repo use a secret reference such"
+                    + " as {{SECRET:[store][key]}} under options: (not secure_options:).")),
 
-    SHALLOW(spec("shallow").displayName("Shallow clone").defaultValue("false")),
+    SHALLOW(spec("shallow").displayName("Shallow clone").defaultValue("false").flag()
+            .describedAs("Fetch only the tip commit; deepens automatically when a build needs an"
+                    + " older revision.")),
 
     FILTER_BY_PATHS(spec("filter_by_paths")
             .displayName("Only trigger on changes under these paths")
-            .defaultValue("false")),
+            .defaultValue("false").flag()
+            .describedAs("Poll only commits that touch the sparse paths, so a pipeline builds only"
+                    + " when its own code changes.")),
 
     /**
      * Clone the agent's working copy with {@code --filter=blob:none}, so file contents are fetched
@@ -82,7 +95,9 @@ public enum ScmProperty {
      */
     PARTIAL_CLONE(spec("partial_clone")
             .displayName("Partial clone (fetch file contents only under the checked-out paths)")
-            .defaultValue("false"));
+            .defaultValue("false").flag()
+            .describedAs("Clone the agent's working copy with --filter=blob:none so file contents"
+                    + " are fetched only for the checked-out paths. Applies on the next clone."));
 
     private final Spec spec;
 
@@ -112,6 +127,21 @@ public enum ScmProperty {
 
     public boolean isRequired() {
         return spec.required;
+    }
+
+    /** One-sentence help text; documentation only, never sent to GoCD. */
+    public String description() {
+        return spec.description;
+    }
+
+    /** True for a {@code "true"}/{@code "false"} option. */
+    public boolean isFlag() {
+        return spec.flag;
+    }
+
+    /** True for an option whose value is one entry per line. */
+    public boolean isMultiline() {
+        return spec.multiline;
     }
 
     public static List<String> keys() {
@@ -162,6 +192,9 @@ public enum ScmProperty {
         private boolean partOfIdentity;
         private boolean secure;
         private boolean required;
+        private boolean flag;
+        private boolean multiline;
+        private String description = "";
 
         private Spec(String key) {
             this.key = key;
@@ -190,6 +223,21 @@ public enum ScmProperty {
 
         private Spec required() {
             this.required = true;
+            return this;
+        }
+
+        private Spec flag() {
+            this.flag = true;
+            return this;
+        }
+
+        private Spec multiline() {
+            this.multiline = true;
+            return this;
+        }
+
+        private Spec describedAs(String description) {
+            this.description = description;
             return this;
         }
     }
